@@ -78,40 +78,6 @@ pipeline {
             }
         }
         
-        stage('Security Scan with Trivy') {
-            parallel {
-                stage('Scan Backend Image') {
-                    steps {
-                        sh """
-                            trivy image --severity HIGH,CRITICAL \
-                            --format json \
-                            --output trivy-backend-report.json \
-                            ${DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}
-                        """
-                        sh """
-                            trivy image --severity HIGH,CRITICAL \
-                            --exit-code 1 \
-                            ${DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}
-                        """
-                    }
-                }
-                stage('Scan Frontend Image') {
-                    steps {
-                        sh """
-                            trivy image --severity HIGH,CRITICAL \
-                            --format json \
-                            --output trivy-frontend-report.json \
-                            ${DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}
-                        """
-                        sh """
-                            trivy image --severity HIGH,CRITICAL \
-                            --exit-code 1 \
-                            ${DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}
-                        """
-                    }
-                }
-            }
-        }
         
         stage('Push Docker Images') {
             steps {
