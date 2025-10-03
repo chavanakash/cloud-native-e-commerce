@@ -40,3 +40,7 @@ RTVZP9VCXJ
 CAR5NVZSQZ
 Q3KD68B956
 APAPVUZ72J
+
+jenkins
+username: admin
+opassword: 1233e101f7db4c7fa9088a09b8b275cf

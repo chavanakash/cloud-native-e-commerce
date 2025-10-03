@@ -47,7 +47,7 @@ pipeline {
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
                                         ${scannerHome}/bin/sonar-scanner \
-                                        -Dsonar.projectKey=ecommerce-backend \
+                                        -Dsonar.projectKey=countryside-backend \
                                         -Dsonar.sources=. \
                                         -Dsonar.host.url=${SONAR_HOST} \
                                         -Dsonar.login=${SONAR_TOKEN} \
@@ -66,7 +66,7 @@ pipeline {
                                 withSonarQubeEnv('SonarQube') {
                                     sh """
                                         ${scannerHome}/bin/sonar-scanner \
-                                        -Dsonar.projectKey=ecommerce-frontend \
+                                        -Dsonar.projectKey=countryside-frontend \
                                         -Dsonar.sources=src \
                                         -Dsonar.host.url=${SONAR_HOST} \
                                         -Dsonar.login=${SONAR_TOKEN}
@@ -93,8 +93,8 @@ pipeline {
                     steps {
                         dir('backend') {
                             script {
-                                dockerImage = docker.build("${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}")
-                                docker.build("${DOCKER_REGISTRY}/ecommerce-backend:latest")
+                                docker.build("${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}")
+                                docker.build("${DOCKER_REGISTRY}/countryside-backend:latest")
                             }
                         }
                     }
@@ -103,8 +103,8 @@ pipeline {
                     steps {
                         dir('frontend') {
                             script {
-                                dockerImage = docker.build("${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}")
-                                docker.build("${DOCKER_REGISTRY}/ecommerce-frontend:latest")
+                                docker.build("${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}")
+                                docker.build("${DOCKER_REGISTRY}/countryside-frontend:latest")
                             }
                         }
                     }
@@ -120,13 +120,12 @@ pipeline {
                             trivy image --severity HIGH,CRITICAL \
                             --format json \
                             --output trivy-backend-report.json \
-                            ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                            ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}
                         """
-                        
                         sh """
                             trivy image --severity HIGH,CRITICAL \
                             --exit-code 1 \
-                            ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                            ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}
                         """
                     }
                 }
@@ -136,13 +135,12 @@ pipeline {
                             trivy image --severity HIGH,CRITICAL \
                             --format json \
                             --output trivy-frontend-report.json \
-                            ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                            ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}
                         """
-                        
                         sh """
                             trivy image --severity HIGH,CRITICAL \
                             --exit-code 1 \
-                            ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                            ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}
                         """
                     }
                 }
@@ -153,10 +151,10 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('', DOCKER_CREDENTIALS) {
-                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}"
-                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-backend:latest"
-                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}"
-                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-frontend:latest"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-backend:latest"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-frontend:latest"
                     }
                 }
             }
@@ -172,10 +170,10 @@ pipeline {
                         kubectl apply -f k8s/ingress.yaml
                         
                         kubectl set image deployment/backend-deployment \
-                            backend=${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                            backend=${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}
                         
                         kubectl set image deployment/frontend-deployment \
-                            frontend=${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                            frontend=${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}
                         
                         kubectl rollout status deployment/backend-deployment
                         kubectl rollout status deployment/frontend-deployment
@@ -197,19 +195,14 @@ pipeline {
     
     post {
         always {
-            // Archive reports
             archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
-            
-            // Clean up
             sh 'docker system prune -af --volumes'
         }
         success {
             echo 'Pipeline executed successfully!'
-            // Send notification (Slack, Email, etc.)
         }
         failure {
             echo 'Pipeline failed!'
-            // Send failure notification
         }
     }
 }
