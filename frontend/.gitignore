@@ -32,3 +32,9 @@ yarn-error.log*
 # Typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Terraform cache and sensitive files
+.terraform/
+*.tfplan
+*.tfstate
+*.tfstate.backup
