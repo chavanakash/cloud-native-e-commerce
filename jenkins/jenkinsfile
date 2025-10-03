@@ -5,6 +5,7 @@ pipeline {
         DOCKER_REGISTRY = 'dockerizzz'
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
         KUBECONFIG = credentials('kubeconfig-base64')
+        PATH = "/opt/homebrew/bin:${env.PATH}"
         // Removed SonarQube related environment variables
     }
     
