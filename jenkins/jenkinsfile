@@ -9,18 +9,29 @@ pipeline {
     }
     
     stages {
-        stage('Checkout') {
+       stage('Checkout') {
             steps {
                 script {
-                    // Ensure the repo is cloned
+                    // Ensure the repo is cloned with credentials
                     checkout([$class: 'GitSCM', 
                               branches: [[name: '*/main']], 
-                              userRemoteConfigs: [[url: 'https://github.com/your-username/countryside.com.git']]])
-                    env.GIT_COMMIT_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                              userRemoteConfigs: [[
+                                  url: 'https://github.com/your-username/countryside.com.git',
+                                  credentialsId: 'github-creds' // Add your Jenkins credential ID here
+                              ]]
+                    ])
+                    
+                    // Get the short commit hash
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+                    
                     echo "Building commit: ${env.GIT_COMMIT_SHORT}"
                 }
-            }
         }
+    }
+
         
         stage('Install Dependencies') {
             parallel {
