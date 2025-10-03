@@ -1,35 +1,39 @@
-# 1. Build stage
-FROM node:18-alpine AS builder
-
-# Set working directory
+# -------------------------------------------------------------------------
+# Stage 1: Builder - Installs ALL dependencies and runs the build.
+# -------------------------------------------------------------------------
+FROM node:20-alpine AS builder 
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install all dependencies
+COPY package.json package-lock.json ./
 RUN npm install
-
-# Copy rest of the frontend code
 COPY . .
+RUN npm run build 
 
-# Build Next.js app
-RUN npm run build
-
-# 2. Production stage
-FROM node:18-alpine AS runner
+# -------------------------------------------------------------------------
+# Stage 2: Dependencies Installer - ONLY installs production dependencies.
+# -------------------------------------------------------------------------
+FROM node:20-alpine AS dependencies
 WORKDIR /app
-
-# Only copy required files from builder
-COPY --from=builder /app/package*.json ./
+COPY package.json package-lock.json ./
+# Install ONLY production dependencies here
 RUN npm install --production
 
-# Copy built Next.js output
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
+# -------------------------------------------------------------------------
+# Stage 3: Runner - The final, minimal image.
+# -------------------------------------------------------------------------
+FROM node:20-alpine AS runner 
+WORKDIR /app
 
-# Expose Next.js default port
+ENV NODE_ENV production
+ENV PORT 3000
+
+# Copy essentials from the relevant stage:
+# 1. The built app from the 'builder' stage
+COPY --from=builder /app/.next ./.next 
+# 2. Production-only node_modules from the 'dependencies' stage
+COPY --from=dependencies /app/node_modules ./node_modules
+# 3. The package.json
+COPY --from=builder /app/package.json ./package.json
+
 EXPOSE 3000
 
-# Start Next.js app
 CMD ["npm", "start"]

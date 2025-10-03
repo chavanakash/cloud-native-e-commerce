@@ -1,0 +1,72 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY = 'dockerizzz' // e.g., 'docker.io/myusername'
+        KUBE_CONFIG_ID = 'your-kubernetes-credential-id' // Jenkins credential ID for Kubeconfig/ServiceAccount
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/frontend-image:${env.BUILD_NUMBER}"
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/backend-image:${env.BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                # Assumes your code is in a Git repo checked out here
+                checkout scm
+            }
+        }
+
+        stage('Build and Push Frontend') {
+            steps {
+                script {
+                    dir('frontend-repo-path') { // Change to your frontend directory
+                        sh "docker build -t ${FRONTEND_IMAGE} -f Dockerfile.frontend ." // Use your specific Dockerfile name
+                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
+                            sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin ${DOCKER_REGISTRY}"
+                            sh "docker push ${FRONTEND_IMAGE}"
+                            sh "docker logout"
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build and Push Backend') {
+            steps {
+                // Similar steps to Frontend for the backend image
+                script {
+                    dir('backend-repo-path') { // Change to your backend directory
+                        sh "docker build -t ${BACKEND_IMAGE} -f Dockerfile.backend ."
+                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
+                            sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin ${DOCKER_REGISTRY}"
+                            sh "docker push ${BACKEND_IMAGE}"
+                            sh "docker logout"
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Update K8s Manifests') {
+            steps {
+                // Use 'sed' or similar tool to replace the image tag with the current build number
+                sh "sed -i 's|<tag>|${env.BUILD_NUMBER}|g' kubernetes/frontend-k8s.yaml"
+                sh "sed -i 's|<tag>|${env.BUILD_NUMBER}|g' kubernetes/backend-k8s.yaml"
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                // Use a Jenkins credential to connect to your Kubernetes cluster
+                withKubeConfig(credentialsId: KUBE_CONFIG_ID) {
+                    // Apply the backend first
+                    sh 'kubectl apply -f kubernetes/backend-k8s.yaml'
+                    // Apply the frontend
+                    sh 'kubectl apply -f kubernetes/frontend-k8s.yaml'
+                    sh 'kubectl rollout status deployment/frontend-deployment'
+                    sh 'kubectl rollout status deployment/backend-deployment'
+                }
+            }
+        }
+    }
+}

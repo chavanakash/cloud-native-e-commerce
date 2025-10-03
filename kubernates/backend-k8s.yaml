@@ -1,0 +1,37 @@
+# --- Backend Deployment ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deployment
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend-container
+        image: dockerizzz/backend-image:latest # Replace with your image
+        ports:
+        - containerPort: 5000
+---
+# --- Backend Service (Internal) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service # This name becomes the DNS name for the backend
+spec:
+  selector:
+    app: backend
+  # ClusterIP makes it only accessible within the cluster by its DNS name (backend-service)
+  type: ClusterIP 
+  ports:
+    - protocol: TCP
+      port: 5000       # Port the service exposes within the cluster
+      targetPort: 5000 # Port the container is listening on

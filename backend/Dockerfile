@@ -1,20 +1,14 @@
-# 1. Use Node.js LTS base image
-FROM node:18-alpine
+FROM node:20-alpine
+WORKDIR /usr/src/app
 
-# 2. Set working directory
-WORKDIR /app
-
-# 3. Copy package.json and package-lock.json
-COPY package*.json ./
-
-# 4. Install dependencies (only prod deps for smaller image)
+COPY package.json package-lock.json ./
+# Only install production dependencies
 RUN npm install --production
 
-# 5. Copy the rest of the backend code
+# Copy application source code
 COPY . .
 
-# 6. Expose backend port (change if your server uses another port)
 EXPOSE 5000
-
-# 7. Start backend server
-CMD ["node", "server.js"]
+# The start script should run your main Express server file, 
+# ensuring it listens on 0.0.0.0 and port 5000.
+CMD [ "npm", "start" ]
