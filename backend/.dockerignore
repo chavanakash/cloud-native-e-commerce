@@ -1,19 +1,10 @@
-# Dependencies
 node_modules
-npm-debug.log*
-
-# Next.js build and cache artifacts
-.next
-.swc
+npm-debug.log
+.env
 .git
 .gitignore
-
-# Logs and temporary files
-logs
+README.md
+.DS_Store
 *.log
-tmp
-*.tmp
-
-# IDE files
-.vscode
-.idea
+uploads/*
+!uploads/.gitkeep

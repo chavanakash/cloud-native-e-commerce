@@ -1,14 +1,30 @@
-FROM node:20-alpine
-WORKDIR /usr/src/app
+# Backend Dockerfile
+FROM node:18-alpine AS base
 
-COPY package.json package-lock.json ./
-# Only install production dependencies
-RUN npm install --production
+# Set working directory
+WORKDIR /app
 
-# Copy application source code
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application files
 COPY . .
 
+# Create uploads directory
+RUN mkdir -p uploads
+
+# Expose port
 EXPOSE 5000
-# The start script should run your main Express server file, 
-# ensuring it listens on 0.0.0.0 and port 5000.
-CMD [ "npm", "start" ]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Set environment to production
+ENV NODE_ENV=production
+
+# Start the application
+CMD ["node", "server.js"]

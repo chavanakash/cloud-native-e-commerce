@@ -1,72 +1,215 @@
 pipeline {
     agent any
-
+    
     environment {
-        DOCKER_REGISTRY = 'dockerizzz' // e.g., 'docker.io/myusername'
-        KUBE_CONFIG_ID = 'your-kubernetes-credential-id' // Jenkins credential ID for Kubeconfig/ServiceAccount
-        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/frontend-image:${env.BUILD_NUMBER}"
-        BACKEND_IMAGE = "${DOCKER_REGISTRY}/backend-image:${env.BUILD_NUMBER}"
+        DOCKER_REGISTRY = 'dockerizzz'
+        DOCKER_CREDENTIALS = 'docker-hub-credentials'
+        SONAR_HOST = 'http://sonarqube:9000'
+        SONAR_TOKEN = credentials('sonarqube-token')
+        KUBECONFIG = credentials('kubeconfig')
+        GIT_COMMIT_SHORT = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
     }
-
+    
     stages {
         stage('Checkout') {
             steps {
-                # Assumes your code is in a Git repo checked out here
                 checkout scm
+                echo "Building commit: ${GIT_COMMIT_SHORT}"
             }
         }
-
-        stage('Build and Push Frontend') {
-            steps {
-                script {
-                    dir('frontend-repo-path') { // Change to your frontend directory
-                        sh "docker build -t ${FRONTEND_IMAGE} -f Dockerfile.frontend ." // Use your specific Dockerfile name
-                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
-                            sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin ${DOCKER_REGISTRY}"
-                            sh "docker push ${FRONTEND_IMAGE}"
-                            sh "docker logout"
+        
+        stage('Install Dependencies') {
+            parallel {
+                stage('Backend Dependencies') {
+                    steps {
+                        dir('backend') {
+                            sh 'npm ci'
+                        }
+                    }
+                }
+                stage('Frontend Dependencies') {
+                    steps {
+                        dir('frontend') {
+                            sh 'npm ci'
                         }
                     }
                 }
             }
         }
         
-        stage('Build and Push Backend') {
-            steps {
-                // Similar steps to Frontend for the backend image
-                script {
-                    dir('backend-repo-path') { // Change to your backend directory
-                        sh "docker build -t ${BACKEND_IMAGE} -f Dockerfile.backend ."
-                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
-                            sh "echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin ${DOCKER_REGISTRY}"
-                            sh "docker push ${BACKEND_IMAGE}"
-                            sh "docker logout"
+        stage('Code Quality Analysis') {
+            parallel {
+                stage('SonarQube - Backend') {
+                    steps {
+                        dir('backend') {
+                            script {
+                                def scannerHome = tool 'SonarScanner'
+                                withSonarQubeEnv('SonarQube') {
+                                    sh """
+                                        ${scannerHome}/bin/sonar-scanner \
+                                        -Dsonar.projectKey=ecommerce-backend \
+                                        -Dsonar.sources=. \
+                                        -Dsonar.host.url=${SONAR_HOST} \
+                                        -Dsonar.login=${SONAR_TOKEN} \
+                                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                                    """
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('SonarQube - Frontend') {
+                    steps {
+                        dir('frontend') {
+                            script {
+                                def scannerHome = tool 'SonarScanner'
+                                withSonarQubeEnv('SonarQube') {
+                                    sh """
+                                        ${scannerHome}/bin/sonar-scanner \
+                                        -Dsonar.projectKey=ecommerce-frontend \
+                                        -Dsonar.sources=src \
+                                        -Dsonar.host.url=${SONAR_HOST} \
+                                        -Dsonar.login=${SONAR_TOKEN}
+                                    """
+                                }
+                            }
                         }
                     }
                 }
             }
         }
-
-        stage('Update K8s Manifests') {
+        
+        stage('Quality Gate') {
             steps {
-                // Use 'sed' or similar tool to replace the image tag with the current build number
-                sh "sed -i 's|<tag>|${env.BUILD_NUMBER}|g' kubernetes/frontend-k8s.yaml"
-                sh "sed -i 's|<tag>|${env.BUILD_NUMBER}|g' kubernetes/backend-k8s.yaml"
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                // Use a Jenkins credential to connect to your Kubernetes cluster
-                withKubeConfig(credentialsId: KUBE_CONFIG_ID) {
-                    // Apply the backend first
-                    sh 'kubectl apply -f kubernetes/backend-k8s.yaml'
-                    // Apply the frontend
-                    sh 'kubectl apply -f kubernetes/frontend-k8s.yaml'
-                    sh 'kubectl rollout status deployment/frontend-deployment'
-                    sh 'kubectl rollout status deployment/backend-deployment'
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
+        }
+        
+        stage('Build Docker Images') {
+            parallel {
+                stage('Build Backend Image') {
+                    steps {
+                        dir('backend') {
+                            script {
+                                dockerImage = docker.build("${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}")
+                                docker.build("${DOCKER_REGISTRY}/ecommerce-backend:latest")
+                            }
+                        }
+                    }
+                }
+                stage('Build Frontend Image') {
+                    steps {
+                        dir('frontend') {
+                            script {
+                                dockerImage = docker.build("${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}")
+                                docker.build("${DOCKER_REGISTRY}/ecommerce-frontend:latest")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Security Scan with Trivy') {
+            parallel {
+                stage('Scan Backend Image') {
+                    steps {
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                            --format json \
+                            --output trivy-backend-report.json \
+                            ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                        """
+                        
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                            --exit-code 1 \
+                            ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                        """
+                    }
+                }
+                stage('Scan Frontend Image') {
+                    steps {
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                            --format json \
+                            --output trivy-frontend-report.json \
+                            ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                        """
+                        
+                        sh """
+                            trivy image --severity HIGH,CRITICAL \
+                            --exit-code 1 \
+                            ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Push Docker Images') {
+            steps {
+                script {
+                    docker.withRegistry('', DOCKER_CREDENTIALS) {
+                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-backend:latest"
+                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/ecommerce-frontend:latest"
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                script {
+                    sh """
+                        kubectl apply -f k8s/mongodb-deployment.yaml
+                        kubectl apply -f k8s/backend-deployment.yaml
+                        kubectl apply -f k8s/frontend-deployment.yaml
+                        kubectl apply -f k8s/ingress.yaml
+                        
+                        kubectl set image deployment/backend-deployment \
+                            backend=${DOCKER_REGISTRY}/ecommerce-backend:${GIT_COMMIT_SHORT}
+                        
+                        kubectl set image deployment/frontend-deployment \
+                            frontend=${DOCKER_REGISTRY}/ecommerce-frontend:${GIT_COMMIT_SHORT}
+                        
+                        kubectl rollout status deployment/backend-deployment
+                        kubectl rollout status deployment/frontend-deployment
+                    """
+                }
+            }
+        }
+        
+        stage('Verify Deployment') {
+            steps {
+                sh """
+                    kubectl get pods
+                    kubectl get services
+                    kubectl get ingress
+                """
+            }
+        }
+    }
+    
+    post {
+        always {
+            // Archive reports
+            archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
+            
+            // Clean up
+            sh 'docker system prune -af --volumes'
+        }
+        success {
+            echo 'Pipeline executed successfully!'
+            // Send notification (Slack, Email, etc.)
+        }
+        failure {
+            echo 'Pipeline failed!'
+            // Send failure notification
         }
     }
 }

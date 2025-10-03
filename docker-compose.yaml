@@ -1,19 +1,60 @@
 version: '3.8'
 
 services:
-  frontend:
-    image: dockerizzz/my-frontend:latest # REPLACE with your actual frontend image name
-    container_name: frontend_container
-    ports:
-      - "3000:3000" # Host port: Container port
-    restart: always
-
+  # Backend API
   backend:
-    image: dockerizzz/my-backend:latest # REPLACE with your actual backend image name
-    container_name: backend_container
-    ports:
-      - "5000:5000" # Host port: Container port
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecommerce-backend
     restart: always
+    ports:
+      - "5000:5000"
     environment:
-      # Example: pass the frontend URL if needed
-      - FRONTEND_URL=http://<EC2_PUBLIC_IP>:3000
+      PORT: 5000
+      MONGODB_URI: mongodb+srv://sabavathakash9_db_user:akashchavan@cluster0.kntpxmf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production-12345
+      NODE_ENV: production
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://backend:5000/api
+    container_name: ecommerce-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://backend:5000/api
+      NODE_ENV: production
+    depends_on:
+      - backend
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  backend_uploads:
+    driver: local
+
+networks:
+  ecommerce-network:
+    driver: bridge

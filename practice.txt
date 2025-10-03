@@ -1,0 +1,42 @@
+kubectl create secret docker-registry dockerhub-secret \
+  --docker-server=https://index.docker.io/v1/ \
+  --docker-username=dockerizzz \
+  --docker-password=acnayak99 \
+  --docker-email=chavanakash2584@gmail.com \
+   --dry-run=client -o yaml | kubectl apply -f -
+
+
+   http://192.168.49.2:30080
+
+   kubectl exec -it frontend-deployment-7d5cffccb7-j5njj -- netstat -tlnp
+
+   username:sabavathakash9_db_user
+   password:akashchavan
+
+   ecommerce-backend:latest
+   ecommerce-frontend:latest
+
+
+    mongodb+srv://sabavathakash9_db_user:akashchavan@cluster0.kntpxmf.mongodb.net/ecommerce?retryWrites=true&w=majority&appName=Cluster0
+    mongodb+srv://sabavathakash9_db_user:akashchavan@cluster0.kntpxmf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+
+
+docker tag countrysidecom-backend dockerizzz/countryside-backend:latest
+docker tag countrysidecom-frontend dockerizzz/countryside-frontend:latest
+
+docker push dockerizzz/countryside-backend:latest
+docker push dockerizzz/countryside-frontend:latest
+
+
+ngrok
+
+ZNWVV6YHXQ
+4RSEQ45S8T
+A7M7NNSWBD
+G2QMC4G3XC
+86X4PJMFE2
+4XF4368AV2
+RTVZP9VCXJ
+CAR5NVZSQZ
+Q3KD68B956
+APAPVUZ72J
