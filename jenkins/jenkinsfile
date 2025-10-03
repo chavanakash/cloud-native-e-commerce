@@ -16,7 +16,7 @@ pipeline {
                     checkout([$class: 'GitSCM', 
                               branches: [[name: '*/main']], 
                               userRemoteConfigs: [[
-                                  url: 'https://github.com/your-username/countryside.com.git',
+                                  url: 'https://github.com/chavanakash/cloud-native-e-commerce.git',
                                   credentialsId: 'github-creds' // Add your Jenkins credential ID here
                               ]]
                     ])
