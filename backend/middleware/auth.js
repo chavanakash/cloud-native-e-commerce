@@ -1,24 +1,67 @@
-import jwt from "jsonwebtoken";
-import User from "../models/User.js";
+const jwt = require('jsonwebtoken');
 
-export const protect = async (req, res, next) => {
-  let token;
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    try {
-      token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = await User.findById(decoded.id).select("-password");
-      if (!req.user) return res.status(401).json({ message: "Not authorized" });
-      next();
-    } catch (error) {
-      return res.status(401).json({ message: "Invalid token" });
+// Verify JWT token
+const authMiddleware = (req, res, next) => {
+  try {
+    // Get token from header
+    const token = req.headers.authorization?.split(' ')[1];
+    
+    if (!token) {
+      return res.status(401).json({ 
+        error: 'No token provided',
+        message: 'Authentication required' 
+      });
     }
-  } else {
-    return res.status(401).json({ message: "No token provided" });
+    
+    // Verify token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Add user info to request
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role
+    };
+    
+    next();
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expired',
+        message: 'Please login again' 
+      });
+    }
+    return res.status(401).json({ 
+      error: 'Invalid token',
+      message: 'Authentication failed' 
+    });
   }
 };
 
-export const requireSeller = (req, res, next) => {
-  if (req.user && req.user.role === "seller") return next();
-  return res.status(403).json({ message: "Seller access required" });
+// Check if user is a seller
+const sellerMiddleware = (req, res, next) => {
+  if (req.user.role !== 'seller') {
+    return res.status(403).json({ 
+      error: 'Access denied',
+      message: 'This action is only available to sellers' 
+    });
+  }
+  next();
+};
+
+// Check if user is an admin
+const adminMiddleware = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ 
+      error: 'Access denied',
+      message: 'This action is only available to administrators' 
+    });
+  }
+  next();
+};
+
+module.exports = {
+  authMiddleware,
+  sellerMiddleware,
+  adminMiddleware
 };
