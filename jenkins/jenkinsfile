@@ -37,66 +37,62 @@ pipeline {
                 }
             }
         }
-
-        stage('Install Dependencies') {
-            parallel {
-                stage('Backend Dependencies') {
-                    steps {
-                        script {
-                            dir('backend') {
-                                if (fileExists('package.json')) {
-                                    sh 'npm ci --prefer-offline --no-audit'
-                                } else {
-                                    error('backend/package.json not found!')
-                                }
-                            }
+        
+        // --- Sequential Dependency Install Stages ---
+        stage('Install Backend Dependencies') {
+            steps {
+                script {
+                    dir('backend') {
+                        if (fileExists('package.json')) {
+                            sh 'npm ci --prefer-offline --no-audit'
+                        } else {
+                            error('backend/package.json not found!')
                         }
                     }
                 }
-                stage('Frontend Dependencies') {
-                    steps {
-                        script {
-                            dir('frontend') {
-                                if (fileExists('package.json')) {
-                                    sh 'npm ci --prefer-offline --no-audit'
-                                } else {
-                                    error('frontend/package.json not found!')
-                                }
-                            }
+            }
+        }
+        
+        stage('Install Frontend Dependencies') {
+            steps {
+                script {
+                    dir('frontend') {
+                        if (fileExists('package.json')) {
+                            sh 'npm ci --prefer-offline --no-audit'
+                        } else {
+                            error('frontend/package.json not found!')
                         }
                     }
                 }
             }
         }
 
-        stage('Build Docker Images') {
-            parallel {
-                stage('Build Backend Image') {
-                    steps {
-                        script {
-                            dir('backend') {
-                                sh """
-                                    docker context use default || true
-                                    docker build -t ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} .
-                                    docker tag ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-backend:latest
-                                """
-                                echo "✅ Backend image built successfully"
-                            }
-                        }
+        // --- Sequential Docker Build Stages ---
+        stage('Build Backend Image') {
+            steps {
+                script {
+                    dir('backend') {
+                        sh """
+                            docker context use default || true
+                            docker build -t ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} .
+                            docker tag ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-backend:latest
+                        """
+                        echo "✅ Backend image built successfully"
                     }
                 }
-                stage('Build Frontend Image') {
-                    steps {
-                        script {
-                            dir('frontend') {
-                                sh """
-                                    docker context use default || true
-                                    docker build -t ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} .
-                                    docker tag ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-frontend:latest
-                                """
-                                echo "✅ Frontend image built successfully"
-                            }
-                        }
+            }
+        }
+        
+        stage('Build Frontend Image') {
+            steps {
+                script {
+                    dir('frontend') {
+                        sh """
+                            docker context use default || true
+                            docker build -t ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} .
+                            docker tag ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-frontend:latest
+                        """
+                        echo "✅ Frontend image built successfully"
                     }
                 }
             }
