@@ -29,49 +29,41 @@ pipeline {
 
         stage('Install Dependencies') {
             parallel {
-                stage('Backend Dependencies') {
-                    steps {
-                        dir('backend') {
-                            sh 'npm ci'
-                        }
+                backend: {
+                    dir('backend') {
+                        sh 'npm ci'
                     }
                 }
-                stage('Frontend Dependencies') {
-                    steps {
-                        dir('frontend') {
-                            sh 'npm ci'
-                        }
+                frontend: {
+                    dir('frontend') {
+                        sh 'npm ci'
                     }
                 }
             }
         }
 
-   stage('Build Docker Images') {
-    parallel {
-        stage('Build Backend Image') {
-            steps {
-                dir('backend') {
-                    sh 'docker context use default'
-                    sh """
-                        docker build -t ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT} .
-                        docker build -t ${DOCKER_REGISTRY}/countryside-backend:latest .
-                    """
+        stage('Build Docker Images') {
+            parallel {
+                backend: {
+                    dir('backend') {
+                        sh 'docker context use default'
+                        sh """
+                            docker build -t ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT} .
+                            docker build -t ${DOCKER_REGISTRY}/countryside-backend:latest .
+                        """
+                    }
+                }
+                frontend: {
+                    dir('frontend') {
+                        sh 'docker context use default'
+                        sh """
+                            docker build -t ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT} .
+                            docker build -t ${DOCKER_REGISTRY}/countryside-frontend:latest .
+                        """
+                    }
                 }
             }
         }
-        stage('Build Frontend Image') {
-            steps {
-                dir('frontend') {
-                    sh 'docker context use default'
-                    sh """
-                        docker build -t ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT} .
-                        docker build -t ${DOCKER_REGISTRY}/countryside-frontend:latest .
-                    """
-                }
-            }
-        }
-    }
-}
 
         stage('Push Docker Images') {
             steps {
