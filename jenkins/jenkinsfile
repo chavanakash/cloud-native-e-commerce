@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // Assume 'dockerizzz' is the host/name part of the registry (e.g., 'myregistry.com')
         DOCKER_REGISTRY = 'dockerizzz'
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
         PATH = "/opt/homebrew/bin:${env.PATH}"
@@ -100,7 +99,6 @@ pipeline {
         stage('Push Docker Images') {
             steps {
                 script {
-                    // FIX: Ensure correct registry URI is passed for authentication
                     docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS) {
                         sh """
                             docker push ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}
