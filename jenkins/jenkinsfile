@@ -139,8 +139,8 @@ pipeline {
                             frontend=${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}
 
                         echo "⏳ Waiting for deployments..."
-                        minikube kubectl -- rollout status deployment/backend-deployment --timeout=300s
-                        minikube kubectl -- rollout status deployment/frontend-deployment --timeout=300s
+                        minikube kubectl -- rollout status deployment/backend-deployment --timeout=120s
+                        minikube kubectl -- rollout status deployment/frontend-deployment --timeout=120s
                     """
 
                     echo "✅ Deployment completed successfully"
