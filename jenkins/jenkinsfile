@@ -148,7 +148,7 @@ pipeline {
             }
         }
 
-
+}
     post {
         always {
             echo '🧹 Cleaning up workspace and Docker cache...'
@@ -169,4 +169,4 @@ pipeline {
             }
         }
     }
-}
+
