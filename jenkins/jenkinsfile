@@ -99,20 +99,20 @@ pipeline {
             steps {
                 script {
                         echo 'Deploying backend and frontend to Minikube...'
-        sh '''
-           
-            minikube kubectl -- apply -f k8s/mongodb-deployment.yaml
-            minikube kubectl -- apply -f k8s/backend-deployment.yaml
-            minikube kubectl -- apply -f k8s/frontend-deployment.yaml
-            minikube kubectl -- apply -f k8s/ingress.yaml
-            minikube kubectl -- set image deployment/backend-deployment backend=dockerizzz/countryside-backend:${GIT_COMMIT_SHORT}
-            minikube kubectl -- set image deployment/frontend-deployment frontend=dockerizzz/countryside-frontend:${GIT_COMMIT_SHORT}
- 
-            minikube kubectl -- rollout status deployment/backend-deployment
-            minikube kubectl -- rollout status deployment/frontend-deployment
-            # Cleanup Docker images and unused resources to free space
-            docker system prune -af --volumes
-        '''
+                        sh '''
+                           
+                            minikube kubectl -- apply -f k8s/mongodb-deployment.yaml
+                            minikube kubectl -- apply -f k8s/backend-deployment.yaml
+                            minikube kubectl -- apply -f k8s/frontend-deployment.yaml
+                            minikube kubectl -- apply -f k8s/ingress.yaml
+                            minikube kubectl -- set image deployment/backend-deployment backend=dockerizzz/countryside-backend:${GIT_COMMIT_SHORT}
+                            minikube kubectl -- set image deployment/frontend-deployment frontend=dockerizzz/countryside-frontend:${GIT_COMMIT_SHORT}
+                 
+                            minikube kubectl -- rollout status deployment/backend-deployment
+                            minikube kubectl -- rollout status deployment/frontend-deployment
+                            # Cleanup Docker images and unused resources to free space
+                            docker system prune -af --volumes
+                        '''
                 }
             }
         }
