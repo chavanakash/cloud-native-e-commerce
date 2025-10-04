@@ -9,25 +9,26 @@ pipeline {
         BRANCH = 'main'
     }
 
-    stage('Checkout Code') {
-    steps {
-        script {
-            echo "🔄 Checking out code from ${env.REPO_URL}..."
-            checkout([$class: 'GitSCM',
-                branches: [[name: "*/${env.BRANCH}"]],
-                doGenerateSubmoduleConfigurations: false,
-                extensions: [[$class: 'CleanCheckout']],
-                userRemoteConfigs: [[
-                    url: "${env.REPO_URL}",
-                    credentialsId: 'github-creds'
-                ]]
-            ])
+    stages {
+        stage('Checkout Code') {
+            steps {
+                script {
+                    echo "🔄 Checking out code from ${env.REPO_URL}..."
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: "*/${env.BRANCH}"]],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [[$class: 'CleanCheckout']],
+                        userRemoteConfigs: [[
+                            url: "${env.REPO_URL}",
+                            credentialsId: 'github-creds'
+                        ]]
+                    ])
 
-            sh 'git status'
-            sh 'ls -la'
+                    sh 'git status'
+                    sh 'ls -la'
+                }
+            }
         }
-    }
-}
 
         stage('Verify Repo Structure') {
             steps {
