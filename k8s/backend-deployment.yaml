@@ -111,9 +111,7 @@ spec:
     - protocol: TCP
       port: 5000
       targetPort: 5000
-  type: NodePort
-  # optional fixed nodePort
-  # nodePort: 30050
+  type: ClusterIP
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
