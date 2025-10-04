@@ -165,6 +165,7 @@ pipeline {
                     minikube kubectl -- logs -l app=backend --tail=50 || true
                     minikube kubectl -- logs -l app=frontend --tail=50 || true
                 '''
+                }
             }
         }
     }
