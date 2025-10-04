@@ -23,6 +23,7 @@ pipeline {
                             credentialsId: 'github-creds'
                         ]]
                     ])
+                    env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
 
                     sh 'git status'
                     sh 'ls -la'
