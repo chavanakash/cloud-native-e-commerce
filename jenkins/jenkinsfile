@@ -5,34 +5,28 @@ pipeline {
         DOCKER_REGISTRY = 'dockerizzz'
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
         PATH = "/opt/homebrew/bin:${env.PATH}"
-        // Removed SonarQube related environment variables
     }
     
     stages {
-       stage('Checkout') {
+        stage('Checkout') {
             steps {
+                checkout([$class: 'GitSCM', 
+                          branches: [[name: '*/main']], 
+                          userRemoteConfigs: [[
+                              url: 'https://github.com/chavanakash/cloud-native-e-commerce.git',
+                              credentialsId: 'github-creds'
+                          ]]
+                ])
                 script {
-                    // Ensure the repo is cloned with credentials
-                    checkout([$class: 'GitSCM', 
-                              branches: [[name: '*/main']], 
-                              userRemoteConfigs: [[
-                                  url: 'https://github.com/chavanakash/cloud-native-e-commerce.git',
-                                  credentialsId: 'github-creds' // Add your Jenkins credential ID here
-                              ]]
-                    ])
-                    
-                    // Get the short commit hash
                     env.GIT_COMMIT_SHORT = sh(
                         script: 'git rev-parse --short HEAD',
                         returnStdout: true
                     ).trim()
-                    
                     echo "Building commit: ${env.GIT_COMMIT_SHORT}"
                 }
+            }
         }
-    }
 
-        
         stage('Install Dependencies') {
             parallel {
                 stage('Backend Dependencies') {
@@ -51,73 +45,69 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Build Docker Images') {
-             steps {
-                    sh 'docker context use default'
-                }
-                parallel {
-                    stage('Build Backend Image') {
-                        steps {
-                            dir('backend') {
-                                script {
-                                    docker.build("${DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}")
-                                    docker.build("${DOCKER_REGISTRY}/countryside-backend:latest")
-                                }
-                            }
-                        }
-                    }
-                    stage('Build Frontend Image') {
-                        steps {
-                            dir('frontend') {
-                                script {
-                                    docker.build("${DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}")
-                                    docker.build("${DOCKER_REGISTRY}/countryside-frontend:latest")
-                                }
-                            }
+            steps {
+                sh 'docker context use default'
+            }
+            parallel {
+                stage('Build Backend Image') {
+                    steps {
+                        dir('backend') {
+                            sh """
+                                docker build -t ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT} .
+                                docker build -t ${DOCKER_REGISTRY}/countryside-backend:latest .
+                            """
                         }
                     }
                 }
+                stage('Build Frontend Image') {
+                    steps {
+                        dir('frontend') {
+                            sh """
+                                docker build -t ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT} .
+                                docker build -t ${DOCKER_REGISTRY}/countryside-frontend:latest .
+                            """
+                        }
+                    }
+                }
+            }
         }
-        
-        
+
         stage('Push Docker Images') {
             steps {
                 script {
                     docker.withRegistry('', DOCKER_CREDENTIALS) {
-                        sh "docker push ${DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT}"
                         sh "docker push ${DOCKER_REGISTRY}/countryside-backend:latest"
-                        sh "docker push ${DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}"
+                        sh "docker push ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT}"
                         sh "docker push ${DOCKER_REGISTRY}/countryside-frontend:latest"
                     }
                 }
             }
         }
-        
+
         stage('Deploy to Kubernetes') {
             steps {
-                script {
-                        echo 'Deploying backend and frontend to Minikube...'
-                       sh '''
-                            minikube kubectl -- apply -f k8s/mongodb-deployment.yaml
-                            minikube kubectl -- apply -f k8s/backend-deployment.yaml
-                            minikube kubectl -- apply -f k8s/frontend-deployment.yaml
-                            minikube kubectl -- set image deployment/backend-deployment backend=dockerizzz/countryside-backend:${GIT_COMMIT_SHORT}
-                            minikube kubectl -- set image deployment/frontend-deployment frontend=dockerizzz/countryside-frontend:${GIT_COMMIT_SHORT}
-                            minikube kubectl -- rollout status deployment/backend-deployment
-                            minikube kubectl -- rollout status deployment/frontend-deployment
-                            docker system prune -af --volumes
-                        '''
-                }
+                echo 'Deploying backend and frontend to Minikube...'
+                sh '''
+                    minikube kubectl -- apply -f k8s/mongodb-deployment.yaml
+                    minikube kubectl -- apply -f k8s/backend-deployment.yaml
+                    minikube kubectl -- apply -f k8s/frontend-deployment.yaml
+                    minikube kubectl -- set image deployment/backend-deployment backend=dockerizzz/countryside-backend:${GIT_COMMIT_SHORT}
+                    minikube kubectl -- set image deployment/frontend-deployment frontend=dockerizzz/countryside-frontend:${GIT_COMMIT_SHORT}
+                    minikube kubectl -- rollout status deployment/backend-deployment
+                    minikube kubectl -- rollout status deployment/frontend-deployment
+                '''
             }
         }
-        
+
         stage('Verify Deployment') {
             steps {
                 sh """
-                    kubectl get pods
-                    kubectl get services
-                    kubectl get ingress
+                    minikube kubectl -- get pods
+                    minikube kubectl -- get services
+                    minikube kubectl -- get ingress
                 """
             }
         }
@@ -125,10 +115,8 @@ pipeline {
     
     post {
         always {
-            script {
-                archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
-                sh 'docker system prune -af --volumes'
-            }
+            sh 'docker system prune -af --volumes'
+            archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
         }
         success {
             echo 'Pipeline executed successfully!'
