@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: frontend-config
 data:
-  NEXT_PUBLIC_API_URL: "http://192.168.49.2:50005/api"
+  NEXT_PUBLIC_API_URL: "http://backend-service:5000/api"
   NODE_ENV: "production"
 ---
 apiVersion: apps/v1
@@ -74,8 +74,8 @@ spec:
     - protocol: TCP
       port: 3000
       targetPort: 3000
-      nodePort: 30005  # fixed node port
-  type: NodePort  # changed from LoadBalancer to NodePort
+      nodePort: 30005
+  type: NodePort
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
