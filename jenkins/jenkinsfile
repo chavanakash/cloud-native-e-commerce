@@ -148,34 +148,40 @@ pipeline {
             }
         }
 
-        stage('Verify Deployment') {
-            steps {
-                script {
-                    echo '🔍 Verifying deployment...'
-                    sh '''
-                        echo "=== Pods ==="
-                        minikube kubectl -- get pods
-
-                        echo "=== Services ==="
-                        minikube kubectl -- get services
-
-                        echo "=== Ingress ==="
-                        minikube kubectl -- get ingress || echo "No ingress found"
-
-                        echo "=== Deployments ==="
-                        minikube kubectl -- get deployments
-                    '''
-
-                    def frontendUrl = sh(
-                        script: 'minikube service frontend-service --url',
-                        returnStdout: true
-                    ).trim()
-
-                    echo "🌐 Application URL: ${frontendUrl}"
-                }
+    stage('Verify Deployment') {
+        steps {
+            script {
+                echo '🔍 Verifying deployment...'
+    
+                // Show current pods, services, ingress, and deployments
+                sh '''
+                    echo "=== Pods ==="
+                    minikube kubectl -- get pods
+    
+                    echo "=== Services ==="
+                    minikube kubectl -- get services
+    
+                    echo "=== Ingress ==="
+                    minikube kubectl -- get ingress || echo "No ingress found"
+    
+                    echo "=== Deployments ==="
+                    minikube kubectl -- get deployments
+                '''
+    
+                // Wait for frontend rollout to complete
+                sh 'minikube kubectl -- rollout status deployment/frontend-deployment --timeout=90s'
+    
+                // Fetch frontend URL instantly
+                def frontendUrl = sh(
+                    script: "minikube service frontend-service --url",
+                    returnStdout: true
+                ).trim()
+    
+                echo "🌐 Frontend Application URL: ${frontendUrl}"
             }
         }
-    }
+}
+
 
     post {
         always {
