@@ -46,33 +46,32 @@ pipeline {
             }
         }
 
-        stage('Build Docker Images') {
+   stage('Build Docker Images') {
+    parallel {
+        stage('Build Backend Image') {
             steps {
-                sh 'docker context use default'
-            }
-            parallel {
-                stage('Build Backend Image') {
-                    steps {
-                        dir('backend') {
-                            sh """
-                                docker build -t ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT} .
-                                docker build -t ${DOCKER_REGISTRY}/countryside-backend:latest .
-                            """
-                        }
-                    }
-                }
-                stage('Build Frontend Image') {
-                    steps {
-                        dir('frontend') {
-                            sh """
-                                docker build -t ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT} .
-                                docker build -t ${DOCKER_REGISTRY}/countryside-frontend:latest .
-                            """
-                        }
-                    }
+                dir('backend') {
+                    sh 'docker context use default'
+                    sh """
+                        docker build -t ${DOCKER_REGISTRY}/countryside-backend:${GIT_COMMIT_SHORT} .
+                        docker build -t ${DOCKER_REGISTRY}/countryside-backend:latest .
+                    """
                 }
             }
         }
+        stage('Build Frontend Image') {
+            steps {
+                dir('frontend') {
+                    sh 'docker context use default'
+                    sh """
+                        docker build -t ${DOCKER_REGISTRY}/countryside-frontend:${GIT_COMMIT_SHORT} .
+                        docker build -t ${DOCKER_REGISTRY}/countryside-frontend:latest .
+                    """
+                }
+            }
+        }
+    }
+}
 
         stage('Push Docker Images') {
             steps {
