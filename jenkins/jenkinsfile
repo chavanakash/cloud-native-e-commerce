@@ -30,7 +30,7 @@ pipeline {
                 }
             }
         }
-
+  }
         stage('Verify Repo Structure') {
             steps {
                 script {
