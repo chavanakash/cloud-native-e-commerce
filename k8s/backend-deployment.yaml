@@ -111,8 +111,9 @@ spec:
     - protocol: TCP
       port: 5000
       targetPort: 5000
-      nodePort: 50005  # fixed NodePort for Minikube
-  type: NodePort  # changed from ClusterIP to NodePort
+  type: NodePort
+  # optional fixed nodePort
+  # nodePort: 30050
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
