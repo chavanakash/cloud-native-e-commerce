@@ -3,7 +3,7 @@ kind: ConfigMap
 metadata:
   name: frontend-config
 data:
-  NEXT_PUBLIC_API_URL: "/api"
+  NEXT_PUBLIC_API_URL: "http://192.168.49.2:50005/api"
   NODE_ENV: "production"
 ---
 apiVersion: apps/v1
