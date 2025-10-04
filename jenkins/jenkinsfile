@@ -5,92 +5,98 @@ pipeline {
         DOCKER_REGISTRY = 'dockerizzz'
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
         PATH = "/opt/homebrew/bin:${env.PATH}"
+        REPO_URL = 'https://github.com/chavanakas/cloud-native-e-commerce.git'
+        BRANCH = 'main'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
                 script {
-                    try {
-                        if (!env.BUILD_NUMBER) {
-                            env.BUILD_NUMBER = "0"
-                        }
-                        checkout([$class: 'GitSCM', 
-                                 branches: [[name: '*/main']], 
-                                 userRemoteConfigs: [[
-                                     url: 'https://github.com/chavanakas/cloud-native-e-commerce.git',
-                                     credentialsId: 'github-creds'
-                                 ]]
-                        ])
-                        
-                        env.GIT_COMMIT_SHORT = sh(
-                            script: 'git rev-parse --short HEAD',
-                            returnStdout: true
-                        ).trim()
+                    echo "🔄 Checking out code from ${env.REPO_URL}..."
+                    checkout([$class: 'GitSCM',
+                        branches: [[name: "*/${env.BRANCH}"]],
+                        userRemoteConfigs: [[
+                            url: "${env.REPO_URL}",
+                            credentialsId: 'github-creds'
+                        ]]
+                    ])
 
-                    } catch (Exception e) {
-                        echo "Git checkout failed: ${e.message}"
-                        echo "Using local workspace instead"
-                        env.GIT_COMMIT_SHORT = "local-${env.BUILD_NUMBER}"
-                    }
-                    echo "Building commit: ${env.GIT_COMMIT_SHORT}"
+                    // Capture short commit ID
+                    env.GIT_COMMIT_SHORT = sh(
+                        script: 'git rev-parse --short HEAD',
+                        returnStdout: true
+                    ).trim()
+
+                    echo "✅ Checked out commit: ${env.GIT_COMMIT_SHORT}"
                 }
             }
         }
-        
+
+        stage('Verify Repo Structure') {
+            steps {
+                script {
+                    echo "🧪 Verifying repo structure..."
+                    sh '''
+                        echo "📁 Workspace: $(pwd)"
+                        echo "🔸 Top-level files:"
+                        ls -la
+                        echo "🔸 Full tree:"
+                        ls -R
+                    '''
+
+                    if (!fileExists('backend/package.json')) {
+                        error "❌ backend/package.json is missing! Check your repo structure or folder names."
+                    }
+
+                    if (!fileExists('frontend/package.json')) {
+                        error "❌ frontend/package.json is missing! Check your repo structure or folder names."
+                    }
+                }
+            }
+        }
+
         stage('Install Backend Dependencies') {
             steps {
-                script {
-                    dir('backend') {
-                        if (fileExists('package.json')) {
-                            sh 'npm ci --prefer-offline --no-audit'
-                        } else {
-                            error('backend/package.json not found!')
-                        }
-                    }
-                }
-            }
-        }
-        
-        stage('Install Frontend Dependencies') {
-            steps {
-                script {
-                    dir('frontend') {
-                        if (fileExists('package.json')) {
-                            sh 'npm ci --prefer-offline --no-audit'
-                        } else {
-                            error('frontend/package.json not found!')
-                        }
-                    }
+                dir('backend') {
+                    sh 'npm ci --prefer-offline --no-audit'
                 }
             }
         }
 
-        stage('Build Backend Image') {
+        stage('Install Frontend Dependencies') {
             steps {
-                script {
-                    dir('backend') {
-                        sh """
-                            docker context use default || true
-                            docker build -t ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} .
-                            docker tag ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-backend:latest
-                        """
-                        echo "✅ Backend image built successfully"
-                    }
+                dir('frontend') {
+                    sh 'npm ci --prefer-offline --no-audit'
                 }
             }
         }
-        
-        stage('Build Frontend Image') {
-            steps {
-                script {
-                    dir('frontend') {
-                        sh """
-                            docker context use default || true
-                            docker build -t ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} .
-                            docker tag ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-frontend:latest
-                        """
-                        echo "✅ Frontend image built successfully"
+
+        stage('Build Docker Images') {
+            parallel {
+                stage('Backend Image') {
+                    steps {
+                        dir('backend') {
+                            sh """
+                                docker context use default || true
+                                docker build -t ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} .
+                                docker tag ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-backend:latest
+                            """
+                            echo "✅ Backend image built successfully"
+                        }
+                    }
+                }
+
+                stage('Frontend Image') {
+                    steps {
+                        dir('frontend') {
+                            sh """
+                                docker context use default || true
+                                docker build -t ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} .
+                                docker tag ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT} ${env.DOCKER_REGISTRY}/countryside-frontend:latest
+                            """
+                            echo "✅ Frontend image built successfully"
+                        }
                     }
                 }
             }
@@ -116,30 +122,29 @@ pipeline {
             steps {
                 script {
                     echo '🚀 Deploying to Kubernetes...'
-                    
+
                     def minikubeStatus = sh(returnStatus: true, script: 'minikube status > /dev/null 2>&1')
-                    
                     if (minikubeStatus != 0) {
-                        echo "⚠️ Minikube is not running or not accessible. Starting Minikube..."
+                        echo "⚠️ Minikube not running. Starting..."
                         sh 'minikube start --memory=4096 --cpus=2'
                     }
-                    
+
                     sh """
                         minikube kubectl -- apply -f k8s/mongodb-deployment.yaml
                         minikube kubectl -- apply -f k8s/backend-deployment.yaml
                         minikube kubectl -- apply -f k8s/frontend-deployment.yaml
-                        
+
                         minikube kubectl -- set image deployment/backend-deployment \
                             backend=${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}
-                        
+
                         minikube kubectl -- set image deployment/frontend-deployment \
                             frontend=${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}
-                        
-                        echo "⏳ Waiting for deployments to complete..."
+
+                        echo "⏳ Waiting for deployments..."
                         minikube kubectl -- rollout status deployment/backend-deployment --timeout=300s
                         minikube kubectl -- rollout status deployment/frontend-deployment --timeout=300s
                     """
-                    
+
                     echo "✅ Deployment completed successfully"
                 }
             }
@@ -149,83 +154,48 @@ pipeline {
             steps {
                 script {
                     echo '🔍 Verifying deployment...'
-                    sh """
+                    sh '''
                         echo "=== Pods ==="
                         minikube kubectl -- get pods
-                        
+
                         echo "=== Services ==="
                         minikube kubectl -- get services
-                        
+
                         echo "=== Ingress ==="
                         minikube kubectl -- get ingress || echo "No ingress found"
-                        
-                        echo "=== Deployment Status ==="
+
+                        echo "=== Deployments ==="
                         minikube kubectl -- get deployments
-                    """
-                    
+                    '''
+
                     def frontendUrl = sh(
                         script: 'minikube service frontend-service --url',
                         returnStdout: true
                     ).trim()
-                    
-                    echo "✅ Application URL: ${frontendUrl}"
+
+                    echo "🌐 Application URL: ${frontendUrl}"
                 }
             }
         }
     }
-    
+
     post {
         always {
-            script {
-                echo '🧹 Cleaning up...'
-                
-                sh 'ls -la trivy-*.json || echo "No Trivy reports found"'
-                archiveArtifacts artifacts: 'trivy-*.json', allowEmptyArchive: true
-                
-                sh 'docker system prune -af --volumes || true'
-            }
+            echo '🧹 Cleaning up workspace and Docker cache...'
+            sh 'docker system prune -af --volumes || true'
+            cleanWs()
         }
         success {
-            script {
-                echo '✅ Pipeline executed successfully! 🥳'
-                echo '================================================'
-                echo 'Deployment Information:'
-                echo "- Backend Image: ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}"
-                echo "- Frontend Image: ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}"
-                echo '================================================'
-                
-                try {
-                    def appUrl = sh(
-                        script: 'minikube service frontend-service --url',
-                        returnStdout: true
-                    ).trim()
-                    echo "🌐 Access your application at: ${appUrl}"
-                } catch (Exception e) {
-                    echo "Run: minikube service frontend-service --url to get the URL"
-                }
-            }
+            echo "✅ Pipeline executed successfully for commit: ${env.GIT_COMMIT_SHORT} 🎉"
         }
         failure {
-            echo '❌ Pipeline failed!'
-            echo 'Check the logs above for details'
-            
             script {
-                try {
-                    sh '''
-                        echo "=== Backend Pod Logs ==="
-                        minikube kubectl -- logs -l app=backend --tail=50 || true
-                        
-                        echo "=== Frontend Pod Logs ==="
-                        minikube kubectl -- logs -l app=frontend --tail=50 || true
-                    '''
-                } catch (Exception e) {
-                    echo "Could not retrieve pod logs: ${e.message}"
-                }
+                echo '❌ Pipeline failed! Fetching pod logs...'
+                sh '''
+                    minikube kubectl -- logs -l app=backend --tail=50 || true
+                    minikube kubectl -- logs -l app=frontend --tail=50 || true
+                '''
             }
-        }
-        cleanup {
-            echo '🔄 Performing workspace cleanup...'
-            cleanWs()
         }
     }
 }
