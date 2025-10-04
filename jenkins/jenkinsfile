@@ -5,7 +5,7 @@ pipeline {
         DOCKER_REGISTRY = 'dockerizzz'
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
         PATH = "/opt/homebrew/bin:${env.PATH}"
-        REPO_URL = 'https://github.com/chavanakas/cloud-native-e-commerce.git'
+        REPO_URL = 'https://github.com/chavanakash/cloud-native-e-commerce.git'
         BRANCH = 'main'
     }
 
