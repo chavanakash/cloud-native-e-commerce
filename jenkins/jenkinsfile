@@ -30,7 +30,7 @@ pipeline {
                 }
             }
         }
-  }
+  
         stage('Verify Repo Structure') {
             steps {
                 script {
@@ -180,7 +180,7 @@ pipeline {
                 echo "🌐 Frontend Application URL: ${frontendUrl}"
             }
         }
-}
+    }
 
 
     post {
