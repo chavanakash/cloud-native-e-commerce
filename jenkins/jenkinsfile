@@ -9,29 +9,25 @@ pipeline {
         BRANCH = 'main'
     }
 
-    stages {
-        stage('Checkout Code') {
-            steps {
-                script {
-                    echo "🔄 Checking out code from ${env.REPO_URL}..."
-                    checkout([$class: 'GitSCM',
-                        branches: [[name: "*/${env.BRANCH}"]],
-                        userRemoteConfigs: [[
-                            url: "${env.REPO_URL}",
-                            credentialsId: 'github-creds'
-                        ]]
-                    ])
+    stage('Checkout Code') {
+    steps {
+        script {
+            echo "🔄 Checking out code from ${env.REPO_URL}..."
+            checkout([$class: 'GitSCM',
+                branches: [[name: "*/${env.BRANCH}"]],
+                doGenerateSubmoduleConfigurations: false,
+                extensions: [[$class: 'CleanCheckout']],
+                userRemoteConfigs: [[
+                    url: "${env.REPO_URL}",
+                    credentialsId: 'github-creds'
+                ]]
+            ])
 
-                    // Capture short commit ID
-                    env.GIT_COMMIT_SHORT = sh(
-                        script: 'git rev-parse --short HEAD',
-                        returnStdout: true
-                    ).trim()
-
-                    echo "✅ Checked out commit: ${env.GIT_COMMIT_SHORT}"
-                }
-            }
+            sh 'git status'
+            sh 'ls -la'
         }
+    }
+}
 
         stage('Verify Repo Structure') {
             steps {
