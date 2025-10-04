@@ -103,14 +103,14 @@ pipeline {
         stage('Push Docker Images') {
             steps {
                 script {
-                    docker.withRegistry("https://${env.DOCKER_REGISTRY}", env.DOCKER_CREDENTIALS) {
+                 docker.withRegistry('https://index.docker.io/v1/', env.DOCKER_CREDENTIALS) {
                         sh """
                             docker push ${env.DOCKER_REGISTRY}/countryside-backend:${env.GIT_COMMIT_SHORT}
                             docker push ${env.DOCKER_REGISTRY}/countryside-backend:latest
                             docker push ${env.DOCKER_REGISTRY}/countryside-frontend:${env.GIT_COMMIT_SHORT}
                             docker push ${env.DOCKER_REGISTRY}/countryside-frontend:latest
                         """
-                        echo "✅ Images pushed to Docker Hub successfully"
+                        echo "Images pushed to docker hub successfully" 
                     }
                 }
             }
