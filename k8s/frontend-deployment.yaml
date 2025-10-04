@@ -74,7 +74,8 @@ spec:
     - protocol: TCP
       port: 3000
       targetPort: 3000
-  type: LoadBalancer
+      nodePort: 30005  # fixed node port
+  type: NodePort  # changed from LoadBalancer to NodePort
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
