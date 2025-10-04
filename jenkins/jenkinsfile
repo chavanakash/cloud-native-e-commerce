@@ -38,7 +38,6 @@ pipeline {
             }
         }
         
-        // --- Sequential Dependency Install Stages ---
         stage('Install Backend Dependencies') {
             steps {
                 script {
@@ -67,7 +66,6 @@ pipeline {
             }
         }
 
-        // --- Sequential Docker Build Stages ---
         stage('Build Backend Image') {
             steps {
                 script {
